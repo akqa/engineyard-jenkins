@@ -7,25 +7,29 @@ module Engineyard
     class CLI < Thor
 
       desc "install PROJECT_PATH", "Install Jenkins node/slave recipes into your project."
-      method_option :host, :aliases => ['-h'], :desc => "Override Jenkins CI server host"
-      method_option :port, :aliases => ['-p'], :desc => "Override Jenkins CI server port"
+      method_option :host,     :aliases => ['-h'], :desc => "Override Jenkins CI server host"
+      method_option :port,     :aliases => ['-p'], :desc => "Override Jenkins CI server port"
+      method_option :username, :aliases => ['-u'], :desc => "Override Jenkins CI server username"
+      method_option :password, :aliases => ['-P'], :desc => "Override Jenkins CI server password"
+      method_option :ssl,      :aliases => ['-s'], :desc => "Override Jenkins CI server ssl", :type => :boolean, :default => false
       def install(project_path)
         host, port = host_port(options)
         unless host && port
-          say "USAGE: ey-jenkins install . --host HOST --port PORT", :red
+          say "USAGE: ey-jenkins install . --host HOST --port PORT --username USERNAME --password PASSWORD --ssl", :red
           say ""
-          say "HOST:PORT default to current jenkins CLI host (set by 'jenkins list --host HOST')"
+          say "All arguments default to current jenkins CLI configuration"
+          say "(set by 'jenkins list --host HOST --port PORT --username USERNAME --password PASSWORD --ssl')"
         else
           tmp_file   = File.join(Dir.tmpdir, "server_pub_key")
           user       = "deploy"
           `scp #{user}@#{host}:~/.ssh/id_rsa.pub #{tmp_file}` # stubbed in fixtures/bin/scp
           public_key = File.read(tmp_file)
-        
+
           require 'engineyard-jenkins/cli/install_generator'
-          Engineyard::Jenkins::InstallGenerator.start(ARGV.unshift(project_path, host, port, public_key))
+          Engineyard::Jenkins::InstallGenerator.start(ARGV.unshift(project_path, host, port, public_key, options["username"], options["password"], "--ssl"))
         end
       end
-      
+
       desc "install_server [PROJECT_PATH]", "Install Jenkins CI into an AppCloud environment."
       method_option :verbose, :aliases     => ["-V"], :desc => "Display more output"
       method_option :environment, :aliases => ["-e"], :desc => "Environment in which to deploy this application", :type => :string
@@ -38,16 +42,16 @@ module Engineyard
         elsif environments.size > 1
           too_many_environments_discovered(environments) and return
         end
-        
+
         env_name, account_name, environment = environments.first
         if environment.instances.first
           public_hostname = environment.instances.first.public_hostname
           status          = environment.instances.first.status
         end
-        
+
         temp_project_path = File.expand_path(project_path || File.join(Dir.tmpdir, "temp_jenkins_server"))
         shell.say "Temp installation dir: #{temp_project_path}" if options[:verbose]
-        
+
         FileUtils.mkdir_p(temp_project_path)
         FileUtils.chdir(temp_project_path) do
           # 'install_server' generator
@@ -58,7 +62,7 @@ module Engineyard
           say "Uploading to "; say "'#{env_name}' ", :yellow; say "environment on "; say "'#{account_name}' ", :yellow; say "account..."
           require 'engineyard/cli/recipes'
           environment.upload_recipes
-          
+
           if status == "running" || status == "error"
             say "Environment is rebuilding..."
             environment.run_custom_recipes
@@ -71,12 +75,12 @@ module Engineyard
             watch_page_while public_hostname, 80, "/" do |req|
               req.body =~ /Please wait while Jenkins is getting ready to work/
             end
-            
+
             require 'jenkins'
             require 'jenkins/config'
             ::Jenkins::Config.config["base_uri"] = public_hostname
             ::Jenkins::Config.store!
-            
+
             say ""
             say "Done! Jenkins CI hosted at "; say "http://#{public_hostname}", :green
           else
@@ -86,7 +90,7 @@ module Engineyard
           end
         end
       end
-      
+
       desc "version", "show version information"
       def version
         require 'engineyard-jenkins/version'
@@ -109,7 +113,7 @@ module Engineyard
         shell.say "ERROR: #{text}", :red
         exit
       end
-      
+
       # Returns the [host, port] for the target Jenkins CI server
       def host_port(options)
         require "jenkins"
@@ -123,23 +127,23 @@ module Engineyard
         port = options["port"] || port || '80'
         [host, port]
       end
-      
+
       def no_environments_discovered
         say "No environments with name jenkins, jenkins_server, jenkins_production, jenkins_server_production.", :red
         say "Either:"
         say "  * Create an AppCloud environment called jenkins, jenkins_server, jenkins_production, jenkins_server_production"
         say "  * Use --environment/--account flags to select AppCloud environment"
       end
-      
+
       def too_many_environments_discovered(environments)
         say "Multiple environments possible, please be more specific:", :red
         say ""
         environments.each do |env_name, account_name, environment|
-          say "  ey-jenkins install_server --environment "; say "'#{env_name}' ", :yellow; 
+          say "  ey-jenkins install_server --environment "; say "'#{env_name}' ", :yellow;
             say "--account "; say "'#{account_name}'", :yellow
         end
       end
-      
+
       def watch_page_while(host, port, path)
         waiting = true
         while waiting
