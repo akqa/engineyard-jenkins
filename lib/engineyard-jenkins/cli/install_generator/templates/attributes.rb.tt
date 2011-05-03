@@ -18,6 +18,6 @@ jenkins_slave({
     :master_key_location => "/home/deploy/.ssh/id_rsa"
   },
   :gem => {
-    :install => "jenkins"
+    :install => "akqa-jenkins"
   }
 })
