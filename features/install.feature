@@ -6,15 +6,16 @@ Feature: Managing a rails project as a Jenkins CI job on AppCloud
     When I run local executable "ey-jenkins" with arguments "install ."
     Then I should see exactly
       """
-      USAGE: ey-jenkins install . --host HOST --port PORT
-      
-      HOST:PORT default to current jenkins CLI host (set by 'jenkins list --host HOST')
+      USAGE: ey-jenkins install . --host HOST --port PORT --username USERNAME --password PASSWORD --ssl
+
+      All arguments default to current jenkins CLI configuration
+      (set by 'jenkins list --host HOST --port PORT --username USERNAME --password PASSWORD --ssl')
       """
-  
+
   Scenario: Setup first project as a slave for Jenkins
     Given I am in the "rails" project folder
     And I have public key "PUBLIC_KEY" on host "ci.mycompany.com"
-    When I run local executable "ey-jenkins" with arguments "install . --host ci.mycompany.com"
+    When I run local executable "ey-jenkins" with arguments "install . --host ci.mycompany.com --ssl --username jenkins --password sniknej"
     Then file "cookbooks/jenkins_slave/attributes/default.rb" is created
     And file "cookbooks/jenkins_slave/recipes/default.rb" is created
     And file "cookbooks/main/recipes/default.rb" is created
@@ -30,7 +31,7 @@ Feature: Managing a rails project as a Jenkins CI job on AppCloud
             create  cookbooks/jenkins_slave/attributes/default.rb
             create  cookbooks/jenkins_slave/recipes/default.rb
             create  cookbooks/main/recipes/default.rb
-      
+
       Finally:
       * edit cookbooks/jenkins_slave/attributes/default.rb as necessary.
       * run: ey recipes upload # use --environment(-e) & --account(-c)
@@ -38,13 +39,13 @@ Feature: Managing a rails project as a Jenkins CI job on AppCloud
       * Boot your environment if not already booted.
       When the recipe completes, your project will commence its first build on Jenkins CI.
       """
-  
+
   Scenario: Setup project with existing cookbooks as a slave for Jenkins
     Given I am in the "rails" project folder
     And I set "ci.mycompany.com" as the default Jenkins server
     And I have public key "PUBLIC_KEY" on host "ci.mycompany.com"
     And I already have cookbooks installed
-    When I run local executable "ey-jenkins" with arguments "install ."
+    When I run local executable "ey-jenkins" with arguments "install . --ssl --username jenkins --password sniknej"
     Then file "cookbooks/jenkins_slave/attributes/default.rb" is created
     And file "cookbooks/jenkins_slave/recipes/default.rb" is created
     And file "cookbooks/main/recipes/default.rb" is created
@@ -64,5 +65,3 @@ Feature: Managing a rails project as a Jenkins CI job on AppCloud
       When the recipe completes, your project will commence its first build on Jenkins CI.
       """
 
-  
-  
